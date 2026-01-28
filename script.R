@@ -1,6 +1,7 @@
     #----- 1. IMPORTER LES PACKAGES -----
 
 library(readxl)
+library(sf)
     
 
     #----- 2. IMPORTER LES DONNÉES -----
@@ -26,3 +27,7 @@ library(readxl)
 # NOM      : libellé des départements
 # INSEE_DEP: numéro de département
 # INSEE_REG: numéro de région
+    
+data_raw <- read_excel("data/data_raw.xlsx")
+data_space <- st_read("carte/DEPARTEMENT.shp") 
+shp_join <- merge(data_space, data_raw, by.x = "INSEE_DEP", by.y = "Code_INSEE", all.x = TRUE)
