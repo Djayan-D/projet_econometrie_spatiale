@@ -277,6 +277,9 @@ plot_choro <- function(data, var, title, pal, nclass = 6) {
       tabtitle = TRUE
     )
   }
+  
+  par(mfrow = c(1,1))
+  
 }
 
 
@@ -345,6 +348,7 @@ coords_sf <- st_as_sf(as.data.frame(coords), coords = c("X", "Y"), crs = crs)
 coords_sp <- as(coords_sf, "Spatial")
 
 
+
     #----- 4.3.1. Réaliser l'opération avec k=1 (le plus proche voisin) -----
 
 # Créer la liste de voisinage
@@ -402,3 +406,169 @@ PPV3 <- nb2listw(neighbors,style="W", zero.policy=TRUE)
 
 
     #----- 5. ANALYSER L'AUTOCORRÉLATION SPATIALE -----
+
+    #----- 5.1. Réaliser le test de Moran pour le taux d'abstention -----
+
+## H0 : Il n'y a pas d'autocorrélation spatiale (p-value > 0.05)
+## H1 : Il y a une autocorrélation spatiale (p-value < 0.05)
+
+## Rappel : une autocorrélation spatiale positive signifie que les départements 
+## ayant des taux d'abstention similaires sont regroupés spatialement, tandis 
+## qu'une autocorrélation spatiale négative indiquerait que les départements 
+## avec des taux d'abstention différents sont regroupés spatialement.
+
+
+    #----- 5.1.1. Faire le test avec la matrice de poids de type Reine ----
+
+# Utiliser la méthode analytique
+
+moran.test(shp_vote$Abstentions_pct, W_reine, zero.policy=TRUE,randomisation=TRUE)
+
+## Résultat : p-value < 2.2e-16 < 0.05 et Moran's I = 0.582064416
+## => On rejette H0 et on conclut qu'il y a une autocorrélation spatiale 
+## positive du taux d'abstention au second tour des élections législatives 
+## anticipées de 2024.
+
+
+# Utiliser la méthode de permutation (Monte Carlo)
+
+set.seed(1234)
+moran.mc(shp_vote$Abstentions_pct, W_reine, nsim = 999, zero.policy = TRUE)
+
+## Résultat : p-value = 0.001 < 0.05
+## => On rejette H0 et on conclut qu'il y a une autocorrélation spatiale.
+
+
+# Conclure sur la base des 2 méthodes
+
+## Les deux méthodes donnent des résultats allant dans le même sens : il existe
+## une autocorrélation spatiale significative au seuil de 5% du taux
+## d'abstention au second tour des élections législatives anticipées de 2024.
+## De plus, Moran's I étant positif, on conclut que cette autocorélation est
+## positive.
+
+
+    #----- 5.1.2. Faire le test avec la matrice de poids de type k=1 ----
+
+# Utiliser la méthode analytique
+
+moran.test(shp_vote$Abstentions_pct, PPV1, zero.policy=TRUE,randomisation=TRUE)
+
+## Résultat : p-value < 4.21e-06 < 0.05 et Moran's I = 0.55362996
+## => On rejette H0 et on conclut qu'il y a une autocorrélation spatiale 
+## positive du taux d'abstention au second tour des élections législatives 
+## anticipées de 2024.
+
+
+# Utiliser la méthode de permutation (Monte Carlo)
+
+set.seed(1234)
+moran.mc(shp_vote$Abstentions_pct, PPV1, nsim = 999, zero.policy = TRUE)
+
+## Résultat : p-value = 0.001 < 0.05
+## => On rejette H0 et on conclut qu'il y a une autocorrélation spatiale.
+
+
+# Conclure sur la base des 2 méthodes
+
+## Les deux méthodes donnent des résultats allant dans le même sens : il existe
+## une autocorrélation spatiale significative au seuil de 5% du taux
+## d'abstention au second tour des élections législatives anticipées de 2024.
+## De plus, Moran's I étant positif, on conclut que cette autocorélation est
+## positive.
+
+
+
+    #----- 5.1.3. Faire le test avec la matrice de poids de type k=3 ----
+
+# Utiliser la méthode analytique
+
+moran.test(shp_vote$Abstentions_pct, PPV3, zero.policy=TRUE,randomisation=TRUE)
+
+## Résultat : p-value < 2.524e-16 < 0.05 et Moran's I = 0.609453860
+## => On rejette H0 et on conclut qu'il y a une autocorrélation spatiale 
+## positive du taux d'abstention au second tour des élections législatives 
+## anticipées de 2024.
+
+
+# Utiliser la méthode de permutation (Monte Carlo)
+
+set.seed(1234)
+moran.mc(shp_vote$Abstentions_pct, PPV3, nsim = 999, zero.policy = TRUE)
+
+## Résultat : p-value = 0.001 < 0.05
+## => On rejette H0 et on conclut qu'il y a une autocorrélation spatiale.
+
+
+# Conclure sur la base des 2 méthodes
+
+## Les deux méthodes donnent des résultats allant dans le même sens : il existe
+## une autocorrélation spatiale significative au seuil de 5% du taux
+## d'abstention au second tour des élections législatives anticipées de 2024.
+## De plus, Moran's I étant positif, on conclut que cette autocorélation est
+## positive.
+
+
+
+    #----- 5.1.4. Conclure sur la base des 3 matrice -----
+
+## Les trois matrices de poids donnent des résultats allant dans le même sens :
+## il existe une autocorrélation spatiale significative au seuil de 5% du taux
+## d'abstention au second tour des élections législatives anticipées de 2024.
+## De plus, Moran's I étant positif dans les trois cas, on conclut que cette
+## autocorrélation est positive. Les coefficients sont très proches, les
+## différences s'expliquant par les différences dans la définition des voisins.
+
+
+
+
+
+    #----- 5.2. Réaliser le diagramme de Moran pour le taux d'abstention -----
+
+## Rappel : Interprétation du diagramme de Moran
+## Axe X : valeur centrée de la variable (x_i - moyenne)
+## Axe Y : moyenne des voisins centrée (W x_i - moyenne)
+## Quadrants :
+## Haut droite  : High-High → cluster positif (valeurs élevées regroupées)
+## Haut gauche : Low-High  → outlier spatial (valeur faible entourée de fortes)
+## Bas gauche : Low-Low   → cluster positif (valeurs faibles regroupées)
+## Bas droite  : High-Low  → outlier spatial (valeur élevée entourée de faibles)
+## Pente de la droite de régression ≈ Moran's I : 
+##   >0 : autocorrélation positive, <0 : autocorrélation négative
+
+
+# Standardiser la variable d'intérêt
+
+shp_vote$Abstentions_pct_std <- scale(shp_vote$Abstentions_pct)
+
+
+    #----- 5.2.1. Faire le diagramme avec la matrice de poids de type Reine ----
+
+moran.plot(as.vector(shp_vote$Abstentions_pct_std),
+           W_reine,
+           xlab="Taux d'abstention", 
+           ylab="Lag Taux d'abstention",
+           main="Matrice type Reine",
+           labels=as.character(shp_vote$Libellé))
+
+
+
+    #----- 5.2.2. Faire le diagramme avec la matrice de poids de type k=1 ----
+
+moran.plot(as.vector(shp_vote$Abstentions_pct_std),
+           PPV1,
+           xlab="Taux d'abstention", 
+           ylab="Lag Taux d'abstention",
+           main="Matrice type PPV1",
+           labels=as.character(shp_vote$Libellé))
+
+
+
+    #----- 5.2.3. Faire le diagramme avec la matrice de poids de type k=3 ----
+
+moran.plot(as.vector(shp_vote$Abstentions_pct_std),
+           PPV3,
+           xlab="Taux d'abstention", 
+           ylab="Lag Taux d'abstention",
+           main="Matrice type PPV3",
+           labels=as.character(shp_vote$Libellé))
