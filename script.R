@@ -110,9 +110,9 @@ shp_vote <- shp_vote |>
 
 
 
-    #----- 3. ANALYSER LES DONNÉES NON SPATIALES ("ÉTUDE UNIVARIÉE") ----
+    #----- 3. ANALYSER LES DONNÉES NON SPATIALES ----
 
-# Réaliser le résumé statistique des variables
+    #----- 3.1. Réaliser le résumé statistique des variables -----
 
 summary(shp_vote$Abstentions_pct)
 summary(shp_vote$Part_25_59_ans)
@@ -120,7 +120,8 @@ summary(shp_vote$Taux_pauvrete_2021)
 summary(shp_vote$Part_Femme)
 
 
-# Visualiser les variables avec des boxplots
+
+    #----- 3.2. Visualiser les variables avec des boxplots -----
 
 ggplot(shp_vote, aes(y = Abstentions_pct)) +
   geom_boxplot() +
@@ -147,9 +148,10 @@ ggplot(shp_vote, aes(y = Part_Femme)) +
   theme_minimal()
 
 
-# Réaliser une première cartographie
 
-## Définir une fonction pour réaliser les cartes choroplèthes
+    #----- 3.3. Réaliser une première cartographie -----
+
+# Définir une fonction pour réaliser les cartes choroplèthes
 
 plot_choro <- function(data, var, title, pal, nclass = 6) {
   
@@ -200,7 +202,7 @@ plot_choro <- function(data, var, title, pal, nclass = 6) {
 
 
 
-## Réaliser les cartes choroplèthes pour les différentes variables
+# Réaliser les cartes choroplèthes pour les différentes variables
 
 plot_choro(
   data = shp_vote,
@@ -284,7 +286,37 @@ plot_choro <- function(data, var, title, pal, nclass = 6) {
 
 
 
-    #----- 4. ANALYSER LES DONNÉES SPATIALES ("ÉTUDE UNIVARIÉE SUITE") ----
+    #----- 3.4. Analyser les corrélations entre les variables -----
+
+cor_matrix <- shp_vote |> 
+  st_drop_geometry() |> 
+  select(Abstentions_pct, Part_25_59_ans, Taux_pauvrete_2021, Part_Femme) |> 
+  cor(method = "spearman", use = "complete.obs")
+
+cor_matrix
+
+## Abstentions_pct est modérément corrélé positivement avec :
+## - Part_25_59_ans (r ≈ 0.38) → les zones avec plus de 25-59 ans tendent
+##   à avoir un peu plus d'abstention.
+## - Taux_pauvrete_2021 (r ≈ 0.31) → l'abstention est légèrement plus
+##   élevée dans les zones plus pauvres.
+
+## Part_25_59_ans est faiblement corrélé négativement avec :
+## - Taux_pauvrete_2021 (r ≈ -0.19) → les zones avec plus d'actifs
+##   ont tendance à être un peu moins pauvres.
+
+## Part_Femme présente des corrélations faibles avec les autres variables :
+## - corrélation légère avec le taux de pauvreté (r ≈ 0.30)
+## - quasi aucune relation avec l'abstention ou la part des 25-59 ans.
+
+## Conclusion : les relations entre variables existent mais restent
+## globalement faibles à modérées (aucune corrélation forte > 0.7).
+
+
+
+
+
+    #----- 4. ANALYSER LES DONNÉES SPATIALES ----
 
     #----- 4.1. Définir les voisins selon le critère de contiguïté d'ordre 1 -----
 
