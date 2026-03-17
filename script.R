@@ -1063,9 +1063,9 @@ print(TestSDM_SEM_ppv3)
 ##            ┌-------┬------------┬------------┐
 ##            | Reine | k=1 (PPV1) | k=3 (PPV3) |
 ## ┌----------|-------┼------------┼------------┤
-## | Le Gallo |  SEM  |   MCO      |    SAR     |
+## | Le Gallo |  SEM  |    MCO     |    SAR     |
 ## ├----------┼-------┼------------┼------------┤
-## | Elhorst  |  SEM  |   MCO      |    SDM     |
+## | Elhorst  |  SEM  |    MCO     |    SDM     |
 ## └----------┴-------┴------------┴------------┘
 
 ## Au final, les modèles choisis sont très similaires entre les 2 méthodes. Il
