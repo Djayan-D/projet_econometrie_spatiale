@@ -734,25 +734,113 @@ print(moran.lm3)
 
 
 
-    #----- 6.4. Trouver le modèle spatial le plus adapté en fonction de la matrice de poids -----
 
-    #----- 6.4.1. Trouver le modèle pour la matrice de poids de type Reine -----
 
-    #----- 6.4.1.1. Réaliser le test de Lagrange -----
+    #----- 7. TROUVER LE MODÈLE SPATIAL LE PLUS ADAPTÉ EN FONCTION DE LA MATRICE DE POIDS -----
+
+    #----- 7.1. Réaliser le test de Lagrange -----
 
 ## Note : lm.RStests remplace lm.LMtests mais garde les mêmes inputs et outputs.
+
+    #----- 7.1.1. Réaliser le test pour la matrice de type Reine -----
 
 LM_reine <- lm.RStests(fit1, W_reine, test=c("LMerr", "LMlag", "RLMerr", "RLMlag"))
 print(LM_reine)
 
 ## Les tests de Lagrange Multiplier robustes montrent que la dépendance spatiale
 ## des résidus du modèle est significative (adjRSerr p = 0.0044), tandis que la 
-## dépendance spatiale du lag n'est pas significative (adjRSlag p = 0.394).
-## => Prochaine étape : estimer un modèle SDM.
+## dépendance spatiale du lag n'est pas significative (adjRSlag p = 0.394). Les
+## tests non robustes sont tout deux significatifs (LMerr p = 3.297e-14 et LMlag 
+## p = 1.405e-12).
+
+
+    #----- 7.1.2. Réaliser le test pour la matrice de type k=1 -----
+
+LM_ppv1 <- lm.RStests(fit1, PPV1, test=c("LMerr", "LMlag", "RLMerr", "RLMlag"))
+print(LM_ppv1)
+
+## Les tests de Lagrange Multiplier classiques (RSerr et RSlag) sont
+## significatifs, ce qui indique la présence d’une dépendance spatiale
+## potentielle dans le modèle. Cependant, les versions robustes des tests
+## (adjRSerr et adjRSlag) ne sont pas significatives (p = 0.8459 et p = 0.1425).
 
 
 
-    #----- 6.4.1.2. Estimer un modèle SDM -----
+    #----- 7.1.3. Réaliser le test pour la matrice de type k=3 -----
+
+LM_ppv3 <- lm.RStests(fit1, PPV3, test=c("LMerr", "LMlag", "RLMerr", "RLMlag"))
+print(LM_ppv3)
+
+## Les tests LM classiques (RSerr et RSlag) sont significatifs, indiquant
+## la présence d’une dépendance spatiale dans le modèle MCO. Les versions
+## robustes des tests montrent que seul le test du lag spatial est
+## significatif (adjRSlag p = 0.0388), tandis que le test de l’erreur
+## spatiale ne l’est pas (adjRSerr p = 0.0616).
+
+
+
+    #----- 7.2. Utiliser la méthode ascendante (Le Gallo) -----
+
+    #----- 7.2.1. Trouver le modèle pour la matrice de poids de type Reine -----
+
+## LMerr -> significatif
+## LMlag -> significatif
+## RLMerr > significatif
+## RLMlag -> non significatif
+
+## D'après la méthode ascendante de Le Gallo, le modèle à privilégier lorsque 
+## les 2 tests de Lagrange Multiplier classiques (LMerr, LMlag) sont 
+## significatifs et que seul le test RLMerr est significatif, est le modèle SEM.
+
+## Conclusion : le modèle SEM est le plus adapté pour la matrice de poids de 
+## type Reine.
+
+
+
+    #----- 7.2.2. Trouver le modèle pour la matrice de poids de type k=1 -----
+
+## LMerr -> significatif
+## LMlag -> significatif
+## RLMerr > non significatif
+## RLMlag -> non significatif
+
+## D'après la méthode ascendante de Le Gallo, aucun modèle n'apparaît à 
+## privilégier lorsque les 2 tests de Lagrange Multiplier classiques sont
+## signficatifs mais qu'aucun des tests robustes ne l'est car cela implique 
+## qu'il n'y a pas de preuve solide en faveur d'un processus de retard spatial 
+## ou d'erreur spatiale exclusivement. Dans ce cas, il est recommandé de rester 
+## sur le modèle MCO (ou en quittant la méthode le Gallo : changer la 
+## spécification du modèle ou envisager d'autres types de modèles (SDM, SLX)).
+
+## Conclusion : le modèle MCO est le plus adapté pour la matrice de poids de 
+## type k=1.
+
+
+
+    #----- 7.2.3. Trouver le modèle pour la matrice de poids de type k=3 -----
+
+## LMerr -> significatif
+## LMlag -> significatif
+## RLMerr > non significatif (à 5%)
+## RLMlag -> significatif
+
+## D'après la méthode ascendante de Le Gallo, le modèle à privilégier lorsque 
+## les 2 tests de Lagrange Multiplier classiques (LMerr, LMlag) sont 
+## significatifs et que seul le test RLMlag est significatif, est le modèle SAR.
+
+## Conclusion : le modèle SAR est le plus adapté pour la matrice de poids de 
+## type k=3.
+
+
+
+    #----- 7.3. Utiliser la méthode Elhorst -----
+
+    #----- 7.3.1. Trouver le modèle pour la matrice de poids de type Reine -----
+
+## Étant donné qu'au moins un des tests Lagrange Multiplier (LM) robuste est,
+## signficiatif, il faut, d'après la méthode Elhorst, estimer un modèle SDM.
+
+    #----- 7.3.1.1. Estimer un modèle SDM -----
 
 sdm_reine <- lagsarlm(Abstentions_pct ~ Part_25_59_ans+Taux_pauvrete_2021+Part_Femme, 
                       data=shp_vote,
@@ -769,7 +857,7 @@ summary(sdm_reine)
 
 
 
-    #----- 6.4.1.3. Estimer un modèle SAR et le comparer au SDM -----
+    #----- 7.3.1.2. Estimer un modèle SAR et le comparer au SDM -----
 
 # Estimer le modèle SAR
 
@@ -810,7 +898,7 @@ print(TestSDM_SAR_reine)
 
 
 
-    #----- 6.4.1.4. Estimer un modèle SEM et le comparer au SDM -----
+    #----- 7.3.1.3. Estimer un modèle SEM et le comparer au SDM -----
 
 # Estimer le modèle SEM
 
@@ -848,22 +936,12 @@ print(TestSDM_SEM_reine)
 
 
 
-    #----- 6.4.2. Utiliser la matrice de poids de type k=1 -----
+    #----- 7.3.2. Utiliser la matrice de poids de type k=1 -----
 
-    #----- 6.4.2.1. Réaliser le test de Lagrange -----
+## Étant donné qu'aucun des tests Lagrange Multiplier (LM) robuste n'est
+## signficiatif, il faut, d'après la méthode Elhorst, estimer un modèle SLX.
 
-LM_ppv1 <- lm.RStests(fit1, PPV1, test=c("LMerr", "LMlag", "RLMerr", "RLMlag"))
-print(LM_ppv1)
-
-## Les tests de Lagrange Multiplier classiques (RSerr et RSlag) sont
-## significatifs, ce qui indique la présence d’une dépendance spatiale
-## potentielle dans le modèle. Cependant, les versions robustes des tests
-## (adjRSerr et adjRSlag) ne sont pas significatives (p = 0.8459 et p = 0.1425).
-## => Prochaine étape : estimer un modèle SLX.
-
-
-
-    #----- 6.4.2.2. Estimer un modèle SLX -----
+    #----- 7.3.2.1. Estimer un modèle SLX -----
 
 slx_ppv1 <- lmSLX(Abstentions_pct ~ Part_25_59_ans+Taux_pauvrete_2021+Part_Femme, 
                   data=shp_vote,
@@ -885,23 +963,12 @@ AIC(slx_ppv1)
 
 
 
-    #----- 6.4.3. Utiliser la matrice de poids de type k=1 -----
+    #----- 7.3.3. Utiliser la matrice de poids de type k=1 -----
 
-    #----- 6.4.3.1. Réaliser le test de Lagrange -----
+## Étant donné qu'au moins un des tests Lagrange Multiplier (LM) robuste est,
+## signficiatif, il faut, d'après la méthode Elhorst, estimer un modèle SDM.
 
-LM_ppv3 <- lm.RStests(fit1, PPV3, test=c("LMerr", "LMlag", "RLMerr", "RLMlag"))
-print(LM_ppv3)
-
-## Les tests LM classiques (RSerr et RSlag) sont significatifs, indiquant
-## la présence d’une dépendance spatiale dans le modèle MCO. Les versions
-## robustes des tests montrent que seul le test du lag spatial est
-## significatif (adjRSlag p = 0.0388), tandis que le test de l’erreur
-## spatiale ne l’est pas (adjRSerr p = 0.0616).
-## => Prochaine étape : estimer un modèle SDM.
-
-
-
-    #----- 6.4.3.2. Estimer un modèle SDM -----
+    #----- 7.3.3.1. Estimer un modèle SDM -----
 
 sdm_ppv3 <- lagsarlm(Abstentions_pct ~ Part_25_59_ans+Taux_pauvrete_2021+Part_Femme, 
                      data=shp_vote,
@@ -918,7 +985,7 @@ summary(sdm_ppv3)
 
 
 
-    #----- 6.4.3.3. Estimer un modèle SAR et le comparer au SDM -----
+    #----- 7.3.3.2. Estimer un modèle SAR et le comparer au SDM -----
 
 # Estimer le modèle SAR
 
@@ -953,7 +1020,7 @@ print(TestSDM_SAR_ppv3)
 
 
 
-    #----- 6.4.3.4. Estimer un modèle SEM et le comparer au SDM -----
+    #----- 7.3.3.3. Estimer un modèle SEM et le comparer au SDM -----
 
 # Estimer le modèle SEM
 
@@ -988,3 +1055,20 @@ print(TestSDM_SEM_ppv3)
 ## indique que le modèle SDM est pas significativement meilleur que le modèle
 ## SEM. Par conséquent, le modèle SDM est le modèle conservé dans le cas de la
 ## matrice de type k=3.
+
+
+
+    #----- 7.4 Comparer les modèles retenus pour les 3 matrices par les 2 méthodes -----
+
+##            ┌-------┬------------┬------------┐
+##            | Reine | k=1 (PPV1) | k=3 (PPV3) |
+## ┌----------|-------┼------------┼------------┤
+## | Le Gallo |  SEM  |   MCO      |    SAR     |
+## ├----------┼-------┼------------┼------------┤
+## | Elhorst  |  SEM  |   MCO      |    SDM     |
+## └----------┴-------┴------------┴------------┘
+
+## Au final, les modèles choisis sont très similaires entre les 2 méthodes. Il
+## faut tout de fois noter que, par exemple, un modèle SDM n'aurait pas pu être
+## sélectionné dans la méthode Le Gallo car, au même titre que le modèle SLX, il
+## ne fait pas partie des modèles proposés.
