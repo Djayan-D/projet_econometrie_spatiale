@@ -8,6 +8,9 @@ library(mapview)
 library(cartography)
 library(dplyr)
 library(spdep)
+library(ggplot2)
+library(car)
+library(spatialreg)
     
 
     #----- 2. IMPORTER LES DONNÉES -----
@@ -149,7 +152,67 @@ ggplot(shp_vote, aes(y = Part_Femme)) +
 
 
 
-    #----- 3.3. Réaliser une première cartographie -----
+    #----- 3.4. Visualiser les variables avec des histogrammes -----
+
+ggplot(shp_vote, aes(x = Abstentions_pct)) +
+  geom_histogram(binwidth = 2, fill = "red", color = "black") +
+  labs(title = "Histogramme du taux d'abstention au second tour des élections législatives anticipées de 2024",
+       x = "Taux d'abstention (%)", 
+       y = "Fréquence") +
+  theme_minimal()
+
+ggplot(shp_vote, aes(x = Part_25_59_ans)) +
+  geom_histogram(binwidth = 2, fill = "blue", color = "black") +
+  labs(title = "Histogramme de la part des personnes âgées de 25 à 59 ans dans la population totale",
+       x = "Part de 25-59 ans (%)", 
+       y = "Fréquence") +
+  theme_minimal()
+
+ggplot(shp_vote, aes(x = Taux_pauvrete_2021)) +
+  geom_histogram(binwidth = 2, fill = "grey", color = "black") +
+  labs(title = "Histogramme du taux de pauvreté en 2021",
+       x = "Taux de pauvreté (%)", 
+       y = "Fréquence") +
+  theme_minimal()
+
+ggplot(shp_vote, aes(x = Part_Femme)) +
+  geom_histogram(binwidth = 2, fill = "pink", color = "black") +
+  labs(title = "Histogramme de la part des femmes dans la population totale en 2024",
+       x = "Part de femmes (%)", 
+       y = "Fréquence") +
+  theme_minimal()
+
+
+
+    #----- 3.4. Analyser les corrélations entre les variables -----
+
+cor_matrix <- shp_vote |> 
+  st_drop_geometry() |> 
+  select(Abstentions_pct, Part_25_59_ans, Taux_pauvrete_2021, Part_Femme) |> 
+  cor(method = "spearman", use = "complete.obs")
+
+cor_matrix
+
+## Abstentions_pct est modérément corrélé positivement avec :
+## - Part_25_59_ans (r ≈ 0.38) → les zones avec plus de 25-59 ans tendent
+##   à avoir un peu plus d'abstention.
+## - Taux_pauvrete_2021 (r ≈ 0.31) → l'abstention est légèrement plus
+##   élevée dans les zones plus pauvres.
+
+## Part_25_59_ans est faiblement corrélé négativement avec :
+## - Taux_pauvrete_2021 (r ≈ -0.19) → les zones avec plus d'actifs
+##   ont tendance à être un peu moins pauvres.
+
+## Part_Femme présente des corrélations faibles avec les autres variables :
+## - corrélation légère avec le taux de pauvreté (r ≈ 0.30)
+## - quasi aucune relation avec l'abstention ou la part des 25-59 ans.
+
+## Conclusion : les relations entre variables existent mais restent
+## globalement faibles à modérées (aucune corrélation forte > 0.7).
+
+
+
+    #----- 3.5. Réaliser une première cartographie -----
 
 # Définir une fonction pour réaliser les cartes choroplèthes
 
@@ -207,7 +270,7 @@ plot_choro <- function(data, var, title, pal, nclass = 6) {
 plot_choro(
   data = shp_vote,
   var = "Abstentions_pct",
-  title = "Taux d'abstention au second tour des élections législatives anticipées de 2024",
+  title = "Taux d'abstention au second tour des élections législatives anticipées de 2024 (en %)",
   pal = "red.pal"
 )
 
@@ -283,34 +346,6 @@ plot_choro <- function(data, var, title, pal, nclass = 6) {
   par(mfrow = c(1,1))
   
 }
-
-
-
-    #----- 3.4. Analyser les corrélations entre les variables -----
-
-cor_matrix <- shp_vote |> 
-  st_drop_geometry() |> 
-  select(Abstentions_pct, Part_25_59_ans, Taux_pauvrete_2021, Part_Femme) |> 
-  cor(method = "spearman", use = "complete.obs")
-
-cor_matrix
-
-## Abstentions_pct est modérément corrélé positivement avec :
-## - Part_25_59_ans (r ≈ 0.38) → les zones avec plus de 25-59 ans tendent
-##   à avoir un peu plus d'abstention.
-## - Taux_pauvrete_2021 (r ≈ 0.31) → l'abstention est légèrement plus
-##   élevée dans les zones plus pauvres.
-
-## Part_25_59_ans est faiblement corrélé négativement avec :
-## - Taux_pauvrete_2021 (r ≈ -0.19) → les zones avec plus d'actifs
-##   ont tendance à être un peu moins pauvres.
-
-## Part_Femme présente des corrélations faibles avec les autres variables :
-## - corrélation légère avec le taux de pauvreté (r ≈ 0.30)
-## - quasi aucune relation avec l'abstention ou la part des 25-59 ans.
-
-## Conclusion : les relations entre variables existent mais restent
-## globalement faibles à modérées (aucune corrélation forte > 0.7).
 
 
 
@@ -604,3 +639,352 @@ moran.plot(as.vector(shp_vote$Abstentions_pct_std),
            ylab="Lag Taux d'abstention",
            main="Matrice type PPV3",
            labels=as.character(shp_vote$Libellé))
+
+
+
+
+
+    #----- 6. ESTIMER ET ANALYSER UN MODÈLE MCO -----
+
+    #----- 6.1. Estimer un modèle de régression linéaire ordinaire (MCO) -----
+
+fit1 <- lm(Abstentions_pct ~ Part_25_59_ans+Taux_pauvrete_2021+Part_Femme, data=shp_vote)
+
+summary(fit1)
+
+## Residuals:
+##   Min      1Q    Median    3Q     Max 
+## -6.8635 -1.8785 -0.1656  2.0337  3.8325 
+## 
+## Coefficients:
+##                    Estimate  Std. Error t value Pr(>|t|)    
+## (Intercept)        13.76261   23.16296   0.594    0.554    
+## Part_25_59_ans      0.52778    0.09796   5.388 5.67e-07 ***
+## Taux_pauvrete_2021  0.45528    0.08063   5.646 1.89e-07 ***
+## Part_Femme         -0.23066    0.45791  -0.504    0.616    
+## ---
+##   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+## 
+## Residual standard error: 2.29 on 90 degrees of freedom
+## Multiple R-squared:  0.3843,	Adjusted R-squared:  0.3638 
+## F-statistic: 18.73 on 3 and 90 DF,  p-value: 1.595e-09
+
+
+AIC(fit1)
+
+## 428.4802
+
+
+
+    #----- 6.2. Vérifier la multicolinéarité -----
+
+vif(fit1)
+
+## Part_25_59_ans  Taux_pauvrete_2021   Part_Femme 
+## 1.022558           1.050571           1.053103
+
+## Pas de problème de multicolinéarité (VIF < 5)
+
+
+
+    #----- 6.3. Calculer l’indice de Moran sur les résidus de l’estimation -----
+
+    #----- 6.3.1. Utiliser la matrice de poids de type Reine -----
+
+moran.lm1 <- lm.morantest(fit1, W_reine, alternative="two.sided")
+print(moran.lm1)
+
+## Résultat : p-value < 2.2e-16 < 0.05 et Moran's I = 0.512257485
+## => On rejette H0 et on conclut qu'il existe une autocorrélation spatiale 
+## positive significative dans les résidus du modèle expliquant le taux 
+## d'abstention au second tour des élections législatives anticipées de 2024.
+## => Cela indique que le modèle MCO présente une dépendance spatiale non 
+## prise en compte, ce qui suggère qu'un modèle économétrique spatial serait 
+## plus approprié.
+
+
+
+    #----- 6.3.2. Utiliser la matrice de poids de type k=1 -----
+
+moran.lm2 <- lm.morantest(fit1, PPV1, alternative="two.sided")
+print(moran.lm2)
+
+## Résultat : p-value < 3.521e-05 < 0.05 et Moran's I = 0.50448548
+## => On rejette H0 et on conclut qu'il existe une autocorrélation spatiale 
+## positive significative dans les résidus du modèle expliquant le taux 
+## d'abstention au second tour des élections législatives anticipées de 2024.
+## => Cela indique que le modèle MCO présente une dépendance spatiale non 
+## prise en compte, ce qui suggère qu'un modèle économétrique spatial serait 
+## plus approprié.
+
+
+
+    #----- 6.3.3. Utiliser la matrice de poids de type k=3 -----
+
+moran.lm3 <- lm.morantest(fit1, PPV3, alternative="two.sided")
+print(moran.lm3)
+
+## Résultat : p-value < 7.276e-11 < 0.05 et Moran's I = 0.467424666
+## => On rejette H0 et on conclut qu'il existe une autocorrélation spatiale 
+## positive significative dans les résidus du modèle expliquant le taux 
+## d'abstention au second tour des élections législatives anticipées de 2024.
+## => Cela indique que le modèle MCO présente une dépendance spatiale non 
+## prise en compte, ce qui suggère qu'un modèle économétrique spatial serait 
+## plus approprié.
+
+
+
+    #----- 6.4. Trouver le modèle spatial le plus adapté en fonction de la matrice de poids -----
+
+    #----- 6.4.1. Trouver le modèle pour la matrice de poids de type Reine -----
+
+    #----- 6.4.1.1. Réaliser le test de Lagrange -----
+
+## Note : lm.RStests remplace lm.LMtests mais garde les mêmes inputs et outputs.
+
+LM_reine <- lm.RStests(fit1, W_reine, test=c("LMerr", "LMlag", "RLMerr", "RLMlag"))
+print(LM_reine)
+
+## Les tests de Lagrange Multiplier robustes montrent que la dépendance spatiale
+## des résidus du modèle est significative (adjRSerr p = 0.0044), tandis que la 
+## dépendance spatiale du lag n'est pas significative (adjRSlag p = 0.394).
+## => Prochaine étape : estimer un modèle SDM.
+
+
+
+    #----- 6.4.1.2. Estimer un modèle SDM -----
+
+sdm_reine <- lagsarlm(Abstentions_pct ~ Part_25_59_ans+Taux_pauvrete_2021+Part_Femme, 
+                      data=shp_vote,
+                      W_reine,
+                      type="mixed")
+summary(sdm_reine)
+
+## Le modèle SDM est valide. Le paramètre spatial ρ est positif et significatif 
+## (p < 0.001), indiquant une dépendance spatiale. Le test LM des résidus n’est 
+## pas significatif (p = 0.53), ce qui indique l'absence d’autocorrélation  
+## spatiale résiduelle. L’AIC est plus faible que celui du modèle MCO (382.33 
+## contre 428.48), ce qui confirme une meilleure spécification.
+## => Prochaine étape : estimer un modèle SAR et le comparer au SDM.
+
+
+
+    #----- 6.4.1.3. Estimer un modèle SAR et le comparer au SDM -----
+
+# Estimer le modèle SAR
+
+sar_reine <- lagsarlm(Abstentions_pct ~ Part_25_59_ans+Taux_pauvrete_2021+Part_Femme, 
+                      data=shp_vote,
+                      W_reine)
+summary(sar_reine)
+
+## Le modèle SAR est valide. Le paramètre spatial ρ est positif et significatif 
+## (p < 0.001), indiquant une dépendance spatiale. Le test LM des résidus n’est 
+## pas significatif (p = 0.14), ce qui indique l’absence d’autocorrélation 
+## spatiale résiduelle. L’AIC est plus faible que celui du modèle MCO (387.61 
+## contre 428.48), ce qui confirme une meilleure spécification.
+
+
+# Comparer SDM et SAR
+
+## Rappel LR.Sarlm(mod1, mod2) :
+## H0 : Le modèle mod2 est suffisant, les effets spatiaux des variables 
+## explicatives ne sont pas nécessaires (p-value > 0.05)
+## H1 : Le modèle mod1 est préférable, l’inclusion des effets spatiaux des 
+## variables explicatives améliore significativement le modèle (p-value < 0.05)
+
+TestSDM_SAR_reine <- LR.Sarlm(sdm_reine, sar_reine)
+print(TestSDM_SAR_reine)
+
+## Likelihood ratio for spatial linear models
+##
+## data:  
+## Likelihood ratio = 11.28, df = 3, p-value = 0.0103
+## sample estimates:
+## Log likelihood of sdm_reine Log likelihood of sar_reine 
+##                   -182.1644                   -187.8045
+
+## Conclusion : le résultat du test est significatif (p = 0.0103 < 0.05) et
+## indique que le modèle SDM est significativement meilleur que le modèle SAR.
+## => Prochaine étape : estimer un modèle SEM et le comparer au SDM.
+
+
+
+    #----- 6.4.1.4. Estimer un modèle SEM et le comparer au SDM -----
+
+# Estimer le modèle SEM
+
+sem_reine <- errorsarlm(Abstentions_pct ~ Part_25_59_ans+Taux_pauvrete_2021+Part_Femme,
+                        data=shp_vote,
+                        W_reine)
+
+summary(sem_reine)
+
+## Le modèle SEM est valide. Le paramètre spatial λ est positif et significatif 
+## (p < 0.001), indiquant une autocorrélation spatiale dans les résidus. Comme 
+## il s’agit d’un modèle d’erreur spatiale, le test LM des résidus n’est pas 
+## nécessaire pour la validité ici. L’AIC est plus faible que celui du modèle 
+## MCO (380.58 contre 428.48), ce qui confirme une meilleure spécification et 
+## que le modèle capture correctement la dépendance spatiale.
+
+
+# Comparer SDM et SEM
+
+TestSDM_SEM_reine <- LR.Sarlm(sdm_reine, sem_reine)
+print(TestSDM_SEM_reine)
+
+## Likelihood ratio for spatial linear models
+##
+## data:  
+## Likelihood ratio = 4.2548, df = 3, p-value = 0.2352
+## sample estimates:
+## Log likelihood of sdm_reine Log likelihood of sem_reine
+##                   -182.1644                   -184.2918
+
+## Conclusion : le résultat du test est non significatif (p = 0.2352 > 0.05) et
+## indique que le modèle SDM n'est pas significativement meilleur que le modèle
+## SEM. Par conséquent, le modèle SEM est le modèle conservé dans le cas de la
+## matrice de type Reine.
+
+
+
+    #----- 6.4.2. Utiliser la matrice de poids de type k=1 -----
+
+    #----- 6.4.2.1. Réaliser le test de Lagrange -----
+
+LM_ppv1 <- lm.RStests(fit1, PPV1, test=c("LMerr", "LMlag", "RLMerr", "RLMlag"))
+print(LM_ppv1)
+
+## Les tests de Lagrange Multiplier classiques (RSerr et RSlag) sont
+## significatifs, ce qui indique la présence d’une dépendance spatiale
+## potentielle dans le modèle. Cependant, les versions robustes des tests
+## (adjRSerr et adjRSlag) ne sont pas significatives (p = 0.8459 et p = 0.1425).
+## => Prochaine étape : estimer un modèle SLX.
+
+
+
+    #----- 6.4.2.2. Estimer un modèle SLX -----
+
+slx_ppv1 <- lmSLX(Abstentions_pct ~ Part_25_59_ans+Taux_pauvrete_2021+Part_Femme, 
+                  data=shp_vote,
+                  PPV1)
+summary(slx_ppv1)
+
+AIC(slx_ppv1)
+
+## Le modèle SLX montre que les variables retardées spatialement ne sont pas 
+## significatives (p > 0.05 pour tous les lags), ce qui indique que θ = 0. 
+## Autrement dit, il n’existe pas d’effet spatial détectable pour ces variables 
+## et, dans ce cas, le modèle reste proche d’un MCO classique. L’AIC du SLX 
+## (431.00) est légèrement supérieur à celui du MCO (428.48), confirmant que 
+## l’inclusion des effets spatiaux n’apporte pas d’amélioration notable.
+
+## Conclusion : étant donné que θ = 0, il n’est pas nécessaire d’estimer un SDM, 
+## et le modèle MCO peut suffire pour cette spécification. Par conséquent, 
+## le modèle MCO est le modèle conservé dans le cas de la matrice de type k=1.
+
+
+
+    #----- 6.4.3. Utiliser la matrice de poids de type k=1 -----
+
+    #----- 6.4.3.1. Réaliser le test de Lagrange -----
+
+LM_ppv3 <- lm.RStests(fit1, PPV3, test=c("LMerr", "LMlag", "RLMerr", "RLMlag"))
+print(LM_ppv3)
+
+## Les tests LM classiques (RSerr et RSlag) sont significatifs, indiquant
+## la présence d’une dépendance spatiale dans le modèle MCO. Les versions
+## robustes des tests montrent que seul le test du lag spatial est
+## significatif (adjRSlag p = 0.0388), tandis que le test de l’erreur
+## spatiale ne l’est pas (adjRSerr p = 0.0616).
+## => Prochaine étape : estimer un modèle SDM.
+
+
+
+    #----- 6.4.3.2. Estimer un modèle SDM -----
+
+sdm_ppv3 <- lagsarlm(Abstentions_pct ~ Part_25_59_ans+Taux_pauvrete_2021+Part_Femme, 
+                     data=shp_vote,
+                     PPV3,
+                     type="mixed")
+summary(sdm_ppv3)
+
+## Le modèle SDM est valide. Le paramètre spatial ρ est positif et significatif 
+## (p < 0.001), indiquant une dépendance spatiale. Le test LM des résidus n’est 
+## pas significatif (p = 0.46), ce qui indique l'absence d’autocorrélation  
+## spatiale résiduelle. L’AIC est plus faible que celui du modèle MCO (386.04 
+## contre 428.48), ce qui confirme une meilleure spécification.
+## => Prochaine étape : estimer un modèle SAR et le comparer au SDM.
+
+
+
+    #----- 6.4.3.3. Estimer un modèle SAR et le comparer au SDM -----
+
+# Estimer le modèle SAR
+
+sar_ppv3 <- lagsarlm(Abstentions_pct ~ Part_25_59_ans+Taux_pauvrete_2021+Part_Femme, 
+                     data=shp_vote,
+                     PPV3)
+summary(sar_ppv3)
+
+## Le modèle SAR est valide. Le paramètre spatial ρ est positif et significatif 
+## (p < 0.001), indiquant une dépendance spatiale. Le test LM des résidus n’est 
+## pas significatif (p = 0.51), ce qui indique l’absence d’autocorrélation 
+## spatiale résiduelle. L’AIC est plus faible que celui du modèle MCO (390.84 
+## contre 428.48), ce qui confirme une meilleure spécification.
+
+
+# Comparer SDM et SAR
+
+TestSDM_SAR_ppv3 <- LR.Sarlm(sdm_ppv3, sar_ppv3)
+print(TestSDM_SAR_ppv3)
+
+## Likelihood ratio for spatial linear models
+##
+## data:  
+## Likelihood ratio = 10.807, df = 3, p-value = 0.01282
+## sample estimates:
+## Log likelihood of sdm_ppv3 Log likelihood of sar_ppv3 
+##                  -184.0189                  -189.4223
+
+## Conclusion : le résultat du test est significatif (p = 0.01282 < 0.05) et
+## indique que le modèle SDM est significativement meilleur que le modèle SAR.
+## => Prochaine étape : estimer un modèle SEM et le comparer au SDM.
+
+
+
+    #----- 6.4.3.4. Estimer un modèle SEM et le comparer au SDM -----
+
+# Estimer le modèle SEM
+
+sem_ppv3 <- errorsarlm(Abstentions_pct ~ Part_25_59_ans+Taux_pauvrete_2021+Part_Femme,
+                       data=shp_vote,
+                       PPV3)
+
+summary(sem_ppv3)
+
+## Le modèle SEM est valide. Le paramètre spatial λ est positif et significatif 
+## (p < 0.001), indiquant une autocorrélation spatiale dans les résidus. Comme 
+## il s’agit d’un modèle d’erreur spatiale, le test LM des résidus n’est pas 
+## nécessaire pour la validité ici. L’AIC est plus faible que celui du modèle 
+## MCO (390.53 contre 428.48), ce qui confirme une meilleure spécification et 
+## que le modèle capture correctement la dépendance spatiale.
+
+
+# Comparer SDM et SEM
+
+TestSDM_SEM_ppv3 <- LR.Sarlm(sdm_ppv3, sem_ppv3)
+print(TestSDM_SEM_ppv3)
+
+## Likelihood ratio for spatial linear models
+##
+## data:  
+## Likelihood ratio = 10.49, df = 3, p-value = 0.01483
+## sample estimates:
+## Log likelihood of sdm_ppv3 Log likelihood of sem_ppv3
+##                  -184.0189                  -189.2638
+
+## Conclusion : le résultat du test est significatif (p = 0.01483 < 0.05) et
+## indique que le modèle SDM est pas significativement meilleur que le modèle
+## SEM. Par conséquent, le modèle SDM est le modèle conservé dans le cas de la
+## matrice de type k=3.
